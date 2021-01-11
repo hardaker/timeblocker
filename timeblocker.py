@@ -36,14 +36,19 @@ def parse_args():
     return args
 
 
-def read_data(input_file_handle, columns):
+def read_data(input_file_handle, columns, time_step):
     import pyfsdb
     fh = pyfsdb.Fsdb(file_handle=input_file_handle)
     column_numbers = fh.get_column_numbers(columns)
     data = []
     for row in fh:
+        end_time = float(row[column_numbers[1]])
+        if (end_time % time_step) != 0:
+            # jump to the next time_step looking forward
+            end_time = end_time - (end_time % time_step) + time_step
+        end_time = int(end_time)
         data.append([int(float(row[column_numbers[0]])),
-                     int(float(row[column_numbers[1]]))])
+                     end_time])
 
     return data
 
@@ -55,7 +60,6 @@ def create_chart(data, timestep):
     """
     output_chart = []    # list of ending times for a block
     height_data = {}
-    initial_time = data[0][0]
     last_time = 0
 
     # for each row of data, find a free block height for it
@@ -120,7 +124,8 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
 
         rect = patches.Rectangle((start_time, height),
                                  time_width, bar_height,
-                                 edgecolor='darkblue', facecolor='mediumblue', linewidth=3)
+                                 edgecolor='darkblue', facecolor='mediumblue',
+                                 linewidth=3)
 
         ax.add_patch(rect)
 
@@ -150,7 +155,7 @@ def main():
         sys.stderr.write("all tests passed\n")
         exit()
 
-    data = read_data(args.input_file, args.time_columns)
+    data = read_data(args.input_file, args.time_columns, args.time_step)
     chart = create_chart(data, args.time_step)
     if args.output_fsdb:
         output_to_fsdb(chart, args.output_file)
@@ -168,6 +173,19 @@ def test_algorithm():
                         [4, 8, 2],
                         [6, 10, 1],
                         [6, 8, 3]]
+    results = create_chart(input_data, time_separator)
+    assert results == expected_results
+
+    # try again with deviations
+    import io
+    f_stream = io.StringIO("#fsdb -F t left right\n4\t5.5\n4\t7.9\n6\t8.1\n6\t6.9\n")
+    input_data = read_data(f_stream, ['left', 'right'], time_separator)
+    rounded_data = [[4, 6],
+                    [4, 8],
+                    [6, 10],
+                    [6, 8]]
+    assert input_data == rounded_data
+
     results = create_chart(input_data, time_separator)
     assert results == expected_results
 
