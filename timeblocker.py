@@ -102,6 +102,8 @@ def draw_chart(chart_data, out_file_name, gap_width=0):
     max_time = 0
     for row in chart_data:
         (start_time, end_time, height) = row
+        start_time = dates.epoch2num(start_time)
+        end_time = dates.epoch2num(end_time)
         rect = patches.Rectangle((start_time, height),
                                  end_time - gap_width, 1, # height = 1,
                                  edgecolor='r', facecolor='k', linewidth=11)
