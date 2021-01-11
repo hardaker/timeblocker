@@ -20,12 +20,17 @@ def parse_args():
     parser.add_argument("-F", "--output-fsdb", action="store_true",
                         help="Output as FSDB data")
 
+    parser.add_argument("--test", action="store_true",
+                        help="Run the test suite")
+
+
+
     parser.add_argument("input_file", type=FileType('r'),
                         nargs='?', default=sys.stdin,
                         help="file where time blocks are stored")
 
     parser.add_argument("output_file", type=str,
-                        nargs=1, help="where to write the output image")
+                        nargs="?", help="where to write the output image")
 
     args = parser.parse_args()
     return args
@@ -37,7 +42,8 @@ def read_data(input_file_handle, columns):
     column_numbers = fh.get_column_numbers(columns)
     data = []
     for row in fh:
-        data.append([int(row[column_numbers[0]]), int(row[column_numbers[1]])])
+        data.append([int(float(row[column_numbers[0]])),
+                     int(float(row[column_numbers[1]]))])
 
     return data
 
@@ -47,8 +53,7 @@ def create_chart(data, timestep):
     start_time, end_time, height.  Input data must be time-sorted by 
     start_time value (column 0).
     """
-    output_chart = []
-    # list of ending times for a block
+    output_chart = []    # list of ending times for a block
     height_data = {}
     initial_time = data[0][0]
     last_time = 0
@@ -113,7 +118,6 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
         start_time = dates.epoch2num(start_time)
         time_width = dates.epoch2num(end_time - gap_width) - start_time
 
-        print(end_time)
         rect = patches.Rectangle((start_time, height),
                                  time_width, bar_height,
                                  edgecolor='darkblue', facecolor='mediumblue', linewidth=3)
@@ -130,19 +134,28 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
 
     fig.autofmt_xdate()
 
-    plt.show()
-
+    if out_file_name:
+        fig.set_dpi(150)
+        fig.set_size_inches(16, 9)
+        plt.savefig(out_file_name, bbox_inches="tight", pad_inches=0)
+    else:
+        plt.show()
 
 
 def main():
     args = parse_args()
+
+    if args.test:
+        test_algorithm()
+        sys.stderr.write("all tests passed\n")
+        exit()
 
     data = read_data(args.input_file, args.time_columns)
     chart = create_chart(data, args.time_step)
     if args.output_fsdb:
         output_to_fsdb(chart, args.output_file)
     else:
-        draw_chart(chart, args.output_file, args.time_step / 20, .5)
+        draw_chart(chart, args.output_file, args.time_step / 10, .5)
 
 
 def test_algorithm():
@@ -160,5 +173,4 @@ def test_algorithm():
 
 
 if __name__ == "__main__":
-    test_algorithm()
     main()
