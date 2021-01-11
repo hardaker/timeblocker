@@ -2,6 +2,7 @@
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, FileType
 import sys
+import matplotlib.dates as dates
 
 def parse_args():
     "Parse the command line arguments."
@@ -90,7 +91,7 @@ def output_to_fsdb(chart_data, output_file_name, column_names):
     outh.close()
 
 
-def draw_chart(chart_data, out_file_name, gap_width=0):
+def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
 
@@ -102,20 +103,32 @@ def draw_chart(chart_data, out_file_name, gap_width=0):
     max_time = 0
     for row in chart_data:
         (start_time, end_time, height) = row
-        start_time = dates.epoch2num(start_time)
-        end_time = dates.epoch2num(end_time)
-        rect = patches.Rectangle((start_time, height),
-                                 end_time - gap_width, 1, # height = 1,
-                                 edgecolor='r', facecolor='k', linewidth=11)
+
         if height > max_height:
             max_height = height
         if end_time > max_time:
             max_time = end_time
+
+        # refactor times into ones matplotlib can understand
+        start_time = dates.epoch2num(start_time)
+        end_time = dates.epoch2num(end_time) - gap_width
+
+        rect = patches.Rectangle((start_time, height),
+                                 gap_width, bar_height, # height = 1,
+                                 edgecolor='r', facecolor='b', linewidth=4)
+
+
         ax.add_patch(rect)
 
-    import pdb ; pdb.set_trace()
-    ax.set_xlim(chart_data[0][0], 2*end_time + gap_width)
-    ax.set_ylim(0, max_height+1)
+    # set the boundaries of the graph
+    ax.set_xlim(dates.epoch2num(chart_data[0][0] - gap_width),
+                dates.epoch2num(max_time + gap_width*2))
+    ax.set_ylim(1 - bar_height / 2, max_height + bar_height*1.5)
+
+    formatter = dates.DateFormatter("%Y/%m/%d\n%H:%M")
+    ax.xaxis.set_major_formatter(formatter)
+
+    fig.autofmt_xdate()
 
     plt.show()
 
@@ -129,7 +142,7 @@ def main():
     if args.output_fsdb:
         output_to_fsdb(chart, args.output_file)
     else:
-        draw_chart(chart, args.output_file, args.time_step / 2)
+        draw_chart(chart, args.output_file, args.time_step / 10, .5)
 
 
 def test_algorithm():
