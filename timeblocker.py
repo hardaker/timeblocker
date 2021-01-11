@@ -111,12 +111,12 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
 
         # refactor times into ones matplotlib can understand
         start_time = dates.epoch2num(start_time)
-        end_time = dates.epoch2num(end_time) - gap_width
+        time_width = dates.epoch2num(end_time - gap_width) - start_time
 
+        print(end_time)
         rect = patches.Rectangle((start_time, height),
-                                 gap_width, bar_height, # height = 1,
-                                 edgecolor='r', facecolor='b', linewidth=4)
-
+                                 time_width, bar_height,
+                                 edgecolor='darkblue', facecolor='mediumblue', linewidth=3)
 
         ax.add_patch(rect)
 
@@ -142,7 +142,7 @@ def main():
     if args.output_fsdb:
         output_to_fsdb(chart, args.output_file)
     else:
-        draw_chart(chart, args.output_file, args.time_step / 10, .5)
+        draw_chart(chart, args.output_file, args.time_step / 20, .5)
 
 
 def test_algorithm():
