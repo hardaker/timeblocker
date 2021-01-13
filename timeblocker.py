@@ -20,13 +20,22 @@ def parse_args():
     parser.add_argument("-T", "--min-time-block", default=0, type=int,
                         help="Minimum number of open blocks between left/right blocks")
 
+    parser.add_argument("-W", "--gap-width", type=float,
+                        help="""The gap width that is removed from the block 
+                        when drawn to ensure
+                        some visible space occurs to the right.  With
+                        a --min-time-blocks greater than 0, this
+                        default value is 0 otherwise it will be
+                        --time-step / 10.0 """)
+
+    parser.add_argument("-B", "--block-height", default=.5, type=float,
+                        help="The height block height")
+
     parser.add_argument("-F", "--output-fsdb", action="store_true",
                         help="Output as FSDB data")
 
     parser.add_argument("--test", action="store_true",
                         help="Run the test suite")
-
-
 
     parser.add_argument("input_file", type=FileType('r'),
                         nargs='?', default=sys.stdin,
@@ -36,6 +45,13 @@ def parse_args():
                         nargs="?", help="where to write the output image")
 
     args = parser.parse_args()
+
+    if not args.gap_width:
+        if args.min_time_block > 0:
+            args.gap_width = 0
+        else:
+            args.gap_width = args.time_step / 10.0
+
     return args
 
 
@@ -65,7 +81,6 @@ def create_chart(data, timestep, min_time_block_offset=0):
     height_data = {}     # timestamps of when a particular height ends
     last_time = 0
     minimum_time_offset = timestep * min_time_block_offset
-
 
     # for each row of data, find a free block height for it
     for row in data:
@@ -110,7 +125,7 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
     import matplotlib.patches as patches
 
     # Create figure and axes
-    fig,ax = plt.subplots(1)
+    fig, ax = plt.subplots(1)
 
     # create rectangles
     max_height = 0
@@ -135,9 +150,11 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
         ax.add_patch(rect)
 
     # set the boundaries of the graph
+    if gap_width == 0:
+        gap_width = 1
     ax.set_xlim(dates.epoch2num(chart_data[0][0] - gap_width),
                 dates.epoch2num(max_time + gap_width*2))
-    ax.set_ylim(1 - bar_height / 2, max_height + bar_height*1.5)
+    ax.set_ylim(1 - bar_height * 1.5, max_height + bar_height*1.5)
 
     formatter = dates.DateFormatter("%Y/%m/%d\n%H:%M")
     ax.xaxis.set_major_formatter(formatter)
@@ -161,12 +178,13 @@ def main():
         exit()
 
     data = read_data(args.input_file, args.time_columns, args.time_step)
+
     chart = create_chart(data, args.time_step,
                          min_time_block_offset=args.min_time_block)
     if args.output_fsdb:
         output_to_fsdb(chart, args.output_file)
     else:
-        draw_chart(chart, args.output_file, args.time_step / 10, .5)
+        draw_chart(chart, args.output_file, args.gap_width, args.block_height)
 
 
 def test_algorithm():
