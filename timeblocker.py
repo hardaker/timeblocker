@@ -75,6 +75,21 @@ def read_data(input_file_handle, columns, time_step):
     return data
 
 
+def add_points(found_points, found_heights, output_chart, height_data):
+    "collects found points and heights into the final chart"
+    def key2(x):
+        return x[1]
+
+    # sort the results by reverse length (longest first) and add to the results
+    found_points = sorted(found_points, key=key2, reverse=True)
+
+    for point, h in zip(found_points, found_heights):
+        height_data[h] = point[1]
+        point.append(h)
+
+    output_chart.extend(found_points)
+
+
 def create_chart(data, timestep, min_time_block_offset=0):
     """Creates an series of output 'blocks' to print, with values of
     start_time, end_time, height.  Input data must be time-sorted by 
@@ -85,11 +100,10 @@ def create_chart(data, timestep, min_time_block_offset=0):
     last_time = 0
     minimum_time_offset = timestep * min_time_block_offset
 
-    def key2(x):
-        return x[2]
-
     # for each row of data, find a free block height for it
-    found_height_list = []
+    found_points = []
+    found_heights = []
+    height = 1
     for row in data:
         (begin_time, end_time) = row
 
@@ -101,25 +115,24 @@ def create_chart(data, timestep, min_time_block_offset=0):
                     new_height_data[value] = height_data[value]
             height_data = new_height_data
 
-            # sort the results by reverse length (longest first) and add to the results
-            sorted(found_height_list, key=key2, reverse=True)
-            output_chart.extend(found_height_list)
+            add_points(found_points, found_heights, output_chart, height_data)
 
-            found_height_list = []
+            found_points = []
+            found_heights = []
+            height = 0
 
         # find a vertical height at which there is no block in height_data
-        height = 1
+        height += 1
         while height in height_data:
             height += 1
 
         # mark this height as now unusable for a while
-        found_height_list.append([begin_time, end_time, height])
-        height_data[height] = end_time
+        found_points.append([begin_time, end_time])
+        found_heights.append(height)
 
         last_time = begin_time
 
-    sorted(found_height_list, key=key2, reverse=True)
-    output_chart.extend(found_height_list)
+    add_points(found_points, found_heights, output_chart, height_data)
 
     return output_chart
 
