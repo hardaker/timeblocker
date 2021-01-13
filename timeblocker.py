@@ -17,6 +17,9 @@ def parse_args():
     parser.add_argument("-t", "--time-step", default=86400, type=int,
                         help="Time step in seconds between blocks")
 
+    parser.add_argument("-T", "--min-time-block", default=0, type=int,
+                        help="Minimum number of open blocks between left/right blocks")
+
     parser.add_argument("-F", "--output-fsdb", action="store_true",
                         help="Output as FSDB data")
 
@@ -53,14 +56,16 @@ def read_data(input_file_handle, columns, time_step):
     return data
 
 
-def create_chart(data, timestep):
+def create_chart(data, timestep, min_time_block_offset=0):
     """Creates an series of output 'blocks' to print, with values of
     start_time, end_time, height.  Input data must be time-sorted by 
     start_time value (column 0).
     """
     output_chart = []    # list of ending times for a block
-    height_data = {}
+    height_data = {}     # timestamps of when a particular height ends
     last_time = 0
+    minimum_time_offset = timestep * min_time_block_offset
+
 
     # for each row of data, find a free block height for it
     for row in data:
@@ -70,7 +75,7 @@ def create_chart(data, timestep):
         if begin_time > last_time:
             new_height_data = {}
             for value in height_data:
-                if height_data[value] > begin_time:
+                if height_data[value] + minimum_time_offset > begin_time:
                     new_height_data[value] = height_data[value]
             height_data = new_height_data
 
@@ -156,7 +161,8 @@ def main():
         exit()
 
     data = read_data(args.input_file, args.time_columns, args.time_step)
-    chart = create_chart(data, args.time_step)
+    chart = create_chart(data, args.time_step,
+                         min_time_block_offset=args.min_time_block)
     if args.output_fsdb:
         output_to_fsdb(chart, args.output_file)
     else:
@@ -175,6 +181,19 @@ def test_algorithm():
                         [6, 8, 3]]
     results = create_chart(input_data, time_separator)
     assert results == expected_results
+
+    # add a minimum of a single block break between one block and the next
+    minimum_spacing = 1
+    input_data = [[4, 6],
+                  [4, 8],
+                  [6, 10],
+                  [6, 8]]
+    offset_expected_results = [[4, 6, 1],
+                        [4, 8, 2],
+                        [6, 10, 3],
+                        [6, 8, 4]]
+    results = create_chart(input_data, time_separator, min_time_block_offset=minimum_spacing)
+    assert results == offset_expected_results
 
     # try again with deviations
     import io
