@@ -61,13 +61,16 @@ def read_data(input_file_handle, columns, time_step):
     column_numbers = fh.get_column_numbers(columns)
     data = []
     for row in fh:
+        begin_time = int(float(row[column_numbers[0]]))
+        begin_time = begin_time - begin_time % time_step
+
         end_time = float(row[column_numbers[1]])
         if (end_time % time_step) != 0:
             # jump to the next time_step looking forward
             end_time = end_time - (end_time % time_step) + time_step
         end_time = int(end_time)
-        data.append([int(float(row[column_numbers[0]])),
-                     end_time])
+
+        data.append([begin_time, end_time])
 
     return data
 
@@ -82,7 +85,11 @@ def create_chart(data, timestep, min_time_block_offset=0):
     last_time = 0
     minimum_time_offset = timestep * min_time_block_offset
 
+    def key2(x):
+        return x[2]
+
     # for each row of data, find a free block height for it
+    found_height_list = []
     for row in data:
         (begin_time, end_time) = row
 
@@ -94,18 +101,25 @@ def create_chart(data, timestep, min_time_block_offset=0):
                     new_height_data[value] = height_data[value]
             height_data = new_height_data
 
+            # sort the results by reverse length (longest first) and add to the results
+            sorted(found_height_list, key=key2, reverse=True)
+            output_chart.extend(found_height_list)
+
+            found_height_list = []
+
         # find a vertical height at which there is no block in height_data
         height = 1
         while height in height_data:
             height += 1
 
         # mark this height as now unusable for a while
+        found_height_list.append([begin_time, end_time, height])
         height_data[height] = end_time
 
-        # save the results
-        output_chart.append([begin_time, end_time, height])
-
         last_time = begin_time
+
+    sorted(found_height_list, key=key2, reverse=True)
+    output_chart.extend(found_height_list)
 
     return output_chart
 
@@ -130,6 +144,7 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
     # create rectangles
     max_height = 0
     max_time = 0
+
     for row in chart_data:
         (start_time, end_time, height) = row
 
@@ -215,7 +230,7 @@ def test_algorithm():
 
     # try again with deviations
     import io
-    f_stream = io.StringIO("#fsdb -F t left right\n4\t5.5\n4\t7.9\n6\t8.1\n6\t6.9\n")
+    f_stream = io.StringIO("#fsdb -F t left right\n4.1\t5.5\n5.8\t7.9\n6\t8.1\n6\t6.9\n")
     input_data = read_data(f_stream, ['left', 'right'], time_separator)
     rounded_data = [[4, 6],
                     [4, 8],
