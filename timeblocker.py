@@ -185,9 +185,9 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
     max_height = 0
     max_time = 0
 
-    face_colors = ['mediumblue', 'purple']
-    edge_colors = ['mediumblue', 'purple']
-    negative_colors = ['orange', 'yellow']
+    face_colors = ['darkviolet', 'crimson']
+    edge_colors = face_colors
+    negative_colors = ['aqua', 'lime']
 
     heights_seen = collections.Counter()
 
