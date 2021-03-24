@@ -2,9 +2,13 @@
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, FileType
 import sys
+import collections
+import io
 import matplotlib.dates as dates
 import matplotlib
-import collections
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import pyfsdb
 
 # set the default font size
 matplotlib.rcParams.update({'font.size': 22})
@@ -65,7 +69,6 @@ def parse_args():
 
 
 def read_data(input_file_handle, columns, positives_column, time_step):
-    import pyfsdb
     fh = pyfsdb.Fsdb(file_handle=input_file_handle)
     column_numbers = fh.get_column_numbers(columns)
     positive_column = -1
@@ -166,7 +169,6 @@ def create_chart(data, timestep, min_time_block_offset=0):
 
 def output_to_fsdb(chart_data, output_file_name, column_names):
     """Writes the chart as a FSDB file with start, end, and height values"""
-    import pyfsdb
     outh = pyfsdb.Fsdb(out_file=output_file_name)
     outh.out_column_names = column_names + ['height']
     for row in chart_data:
@@ -175,8 +177,6 @@ def output_to_fsdb(chart_data, output_file_name, column_names):
 
 
 def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as patches
 
     # Create figure and axes
     fig, ax = plt.subplots(1)
@@ -286,7 +286,6 @@ def test_algorithm():
     assert results == offset_expected_results
 
     # try again with deviations
-    import io
     f_stream = io.StringIO("#fsdb -F t left right\n4.1\t5.5\n5.8\t7.9\n6\t8.1\n6\t6.9\n")
     input_data = read_data(f_stream, ['left', 'right'], time_separator)
     rounded_data = [[4, 6],
