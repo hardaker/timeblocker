@@ -3,6 +3,12 @@
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, FileType
 import sys
 import matplotlib.dates as dates
+import matplotlib
+import collections
+
+# set the default font size
+matplotlib.rcParams.update({'font.size': 22})
+
 
 def parse_args():
     "Parse the command line arguments."
@@ -13,6 +19,9 @@ def parse_args():
     parser.add_argument("-c", "--time-columns", default=['begin_time', 'end_time'],
                         type=str, nargs=2,
                         help="Start and stop column names to use")
+
+    parser.add_argument("-p", "--positive-column", default=None, type=str,
+                        help="The column to use for determining whether a square should be solid (if > 0) or or not (will always be solid if not used)")
 
     parser.add_argument("-t", "--time-step", default=86400, type=int,
                         help="Time step in seconds between blocks")
@@ -55,10 +64,13 @@ def parse_args():
     return args
 
 
-def read_data(input_file_handle, columns, time_step):
+def read_data(input_file_handle, columns, positives_column, time_step):
     import pyfsdb
     fh = pyfsdb.Fsdb(file_handle=input_file_handle)
     column_numbers = fh.get_column_numbers(columns)
+    positive_column = -1
+    if positives_column:
+        positive_column = fh.get_column_number(positives_column)
     data = []
     for row in fh:
         begin_time = int(float(row[column_numbers[0]]))
@@ -70,9 +82,17 @@ def read_data(input_file_handle, columns, time_step):
             end_time = end_time - (end_time % time_step) + time_step
         end_time = int(end_time)
 
-        data.append([begin_time, end_time])
+        positives = 1
+        if positive_column != -1:
+            positives = row[positive_column]
+
+        data.append([begin_time, end_time, positives])
 
     return data
+
+
+# stores the number of times we saw something at this height
+height_counts = collections.Counter()
 
 
 def add_points(found_points, found_heights, output_chart, height_data):
@@ -94,31 +114,36 @@ def create_chart(data, timestep, min_time_block_offset=0):
     """Creates an series of output 'blocks' to print, with values of
     start_time, end_time, height.  Input data must be time-sorted by 
     start_time value (column 0).
+
     """
     output_chart = []    # list of ending times for a block
     height_data = {}     # timestamps of when a particular height ends
     last_time = 0
     minimum_time_offset = timestep * min_time_block_offset
 
-    # for each row of data, find a free block height for it
-    found_points = []
-    found_heights = []
+    found_points = []  # [start_time, end_time]
+    found_heights = []  # height of current
     height = 1
-    for row in data:
-        (begin_time, end_time) = row
 
-        # drop old used markers
+    # for each row of data, find a free block height for it
+    for row in data:
+        (begin_time, end_time, positives) = row
+
+        # we found a new time-point, do clean up from the last
         if begin_time > last_time:
+            # drop old used markers
             new_height_data = {}
             for value in height_data:
                 if height_data[value] + minimum_time_offset > begin_time:
                     new_height_data[value] = height_data[value]
             height_data = new_height_data
 
-            add_points(found_points, found_heights, output_chart, height_data)
+            add_points(found_points, found_heights,
+                       output_chart, height_data)
 
             found_points = []
             found_heights = []
+            found_positives = []
             height = 0
 
         # find a vertical height at which there is no block in height_data
@@ -126,9 +151,11 @@ def create_chart(data, timestep, min_time_block_offset=0):
         while height in height_data:
             height += 1
 
-        # mark this height as now unusable for a while
-        found_points.append([begin_time, end_time])
-        found_heights.append(height)
+        # remember this point in a list to add at the end of the time period
+        found_points.append([begin_time, end_time, positives])
+        found_heights.append(height)  # record the height it should be plotted at
+        found_positives.append(positives)
+        height_counts[height] += 1
 
         last_time = begin_time
 
@@ -158,8 +185,14 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
     max_height = 0
     max_time = 0
 
+    face_colors = ['mediumblue', 'purple']
+    edge_colors = ['mediumblue', 'purple']
+    negative_colors = ['orange', 'yellow']
+
+    heights_seen = collections.Counter()
+
     for row in chart_data:
-        (start_time, end_time, height) = row
+        (start_time, end_time, positives, height) = row
 
         if height > max_height:
             max_height = height
@@ -170,9 +203,19 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
         start_time = dates.epoch2num(start_time)
         time_width = dates.epoch2num(end_time - gap_width) - start_time
 
+        heights_seen[height] += 1
+        facecolor = None
+        positives = int(positives)
+        if positives > 0:
+            facecolor = face_colors[heights_seen[height] % len(edge_colors)]
+            edgecolor = edge_colors[heights_seen[height] % len(edge_colors)]
+        else:
+            facecolor = negative_colors[heights_seen[height] % len(negative_colors)]
+            edgecolor = facecolor
         rect = patches.Rectangle((start_time, height),
                                  time_width, bar_height,
-                                 edgecolor='darkblue', facecolor='mediumblue',
+                                 edgecolor=edgecolor,
+                                 facecolor=facecolor,
                                  linewidth=3)
 
         ax.add_patch(rect)
@@ -182,17 +225,17 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
         gap_width = 1
     ax.set_xlim(dates.epoch2num(chart_data[0][0] - gap_width),
                 dates.epoch2num(max_time + gap_width*2))
-    ax.set_ylim(1 - bar_height * 1.5, max_height + bar_height*1.5)
+    ax.set_ylim(0 - bar_height * 1.5, max_height + bar_height*1.5 + 1)
 
-    formatter = dates.DateFormatter("%Y/%m/%d\n%H:%M")
+    formatter = dates.DateFormatter("%Y/%m/%d")
     ax.xaxis.set_major_formatter(formatter)
 
     fig.autofmt_xdate()
 
     if out_file_name:
         fig.set_dpi(150)
-        fig.set_size_inches(16, 9)
-        plt.savefig(out_file_name, bbox_inches="tight", pad_inches=0)
+        fig.set_size_inches(16, 16)
+        plt.savefig(out_file_name, bbox_inches="tight", pad_inches=.1)
     else:
         plt.show()
 
@@ -205,7 +248,8 @@ def main():
         sys.stderr.write("all tests passed\n")
         exit()
 
-    data = read_data(args.input_file, args.time_columns, args.time_step)
+    data = read_data(args.input_file, args.time_columns,
+                     args.positive_column, args.time_step)
 
     chart = create_chart(data, args.time_step,
                          min_time_block_offset=args.min_time_block)
