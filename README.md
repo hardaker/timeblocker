@@ -9,7 +9,7 @@ matplotlib can generate (png, pdf)
 
 # Example Usage
 
-See the [./example/test.fsdb](example/test.fsdb) for an example
+See the [./examples/test.fsdb](example/test.fsdb) for an example
 dataset using 'day' size bins (the default).  Running this as follows:
 
 ```
@@ -26,6 +26,4 @@ Wes Hardaker <opensource ATAT hardakers.net>
 
 # See also
 
-The FSDB website and manual page for the original perl module: 
-
-https://www.isi.edu/~johnh/SOFTWARE/FSDB/
+The [FSDB documentation website](https://fsdb.readthedocs.io/)
