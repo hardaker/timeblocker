@@ -200,8 +200,8 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
             max_time = end_time
 
         # refactor times into ones matplotlib can understand
-        start_time = dates.epoch2num(start_time)
-        time_width = dates.epoch2num(end_time - gap_width) - start_time
+        start_time = dates.date2num(start_time)
+        time_width = dates.date2num(end_time - gap_width) - start_time
 
         heights_seen[height] += 1
         facecolor = None
@@ -223,8 +223,8 @@ def draw_chart(chart_data, out_file_name, gap_width=0, bar_height=.9):
     # set the boundaries of the graph
     if gap_width == 0:
         gap_width = 1
-    ax.set_xlim(dates.epoch2num(chart_data[0][0] - gap_width),
-                dates.epoch2num(max_time + gap_width*2))
+    ax.set_xlim(dates.date2num(chart_data[0][0] - gap_width),
+                dates.date2num(max_time + gap_width*2))
     ax.set_ylim(0 - bar_height * 1.5, max_height + bar_height*1.5 + 1)
 
     formatter = dates.DateFormatter("%Y/%m/%d")
