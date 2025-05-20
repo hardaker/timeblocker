@@ -9,7 +9,7 @@ matplotlib can generate (png, pdf)
 
 # Example Usage
 
-See the [./examples/test.fsdb](example/test.fsdb) for an example
+See the [./examples/test.fsdb](examples/test.fsdb) for an example
 dataset using 'day' size bins (the default).  Running this as follows:
 
 ```
